@@ -1,18 +1,49 @@
 
+import { db } from '../db';
+import { proposalsTable } from '../db/schema';
 import { type UpdateProposalInput, type Proposal } from '../schema';
+import { eq } from 'drizzle-orm';
 
-export async function updateProposal(input: UpdateProposalInput): Promise<Proposal> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is updating proposal details like title, description, status, or current phase.
-    return Promise.resolve({
-        id: input.id,
-        user_id: 0, // Placeholder
-        organization_id: 0, // Placeholder
-        title: input.title || 'Updated Title',
-        description: input.description || null,
-        status: input.status || 'planning',
-        current_phase: input.current_phase || 'planning',
-        created_at: new Date(),
-        updated_at: new Date()
-    } as Proposal);
-}
+export const updateProposal = async (input: UpdateProposalInput): Promise<Proposal> => {
+  try {
+    // Build the update object dynamically, only including provided fields
+    const updateData: Partial<{
+      title: string;
+      description: string | null;
+      status: 'planning' | 'drafting' | 'completed' | 'archived';
+      current_phase: 'planning' | 'drafting';
+      updated_at: Date;
+    }> = {
+      updated_at: new Date()
+    };
+
+    if (input.title !== undefined) {
+      updateData.title = input.title;
+    }
+    if (input.description !== undefined) {
+      updateData.description = input.description;
+    }
+    if (input.status !== undefined) {
+      updateData.status = input.status;
+    }
+    if (input.current_phase !== undefined) {
+      updateData.current_phase = input.current_phase;
+    }
+
+    // Update the proposal
+    const result = await db.update(proposalsTable)
+      .set(updateData)
+      .where(eq(proposalsTable.id, input.id))
+      .returning()
+      .execute();
+
+    if (result.length === 0) {
+      throw new Error(`Proposal with id ${input.id} not found`);
+    }
+
+    return result[0];
+  } catch (error) {
+    console.error('Proposal update failed:', error);
+    throw error;
+  }
+};

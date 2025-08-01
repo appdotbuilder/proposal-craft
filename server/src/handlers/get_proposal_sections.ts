@@ -1,8 +1,20 @@
 
+import { db } from '../db';
+import { proposalSectionsTable } from '../db/schema';
 import { type ProposalSection } from '../schema';
+import { eq, asc } from 'drizzle-orm';
 
-export async function getProposalSections(proposalId: number): Promise<ProposalSection[]> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is fetching all sections for a proposal ordered by order_index.
-    return [];
-}
+export const getProposalSections = async (proposalId: number): Promise<ProposalSection[]> => {
+  try {
+    const result = await db.select()
+      .from(proposalSectionsTable)
+      .where(eq(proposalSectionsTable.proposal_id, proposalId))
+      .orderBy(asc(proposalSectionsTable.order_index))
+      .execute();
+
+    return result;
+  } catch (error) {
+    console.error('Failed to get proposal sections:', error);
+    throw error;
+  }
+};

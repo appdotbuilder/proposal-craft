@@ -1,17 +1,25 @@
 
+import { db } from '../db';
+import { proposalSectionsTable } from '../db/schema';
 import { type CreateProposalSectionInput, type ProposalSection } from '../schema';
 
-export async function createProposalSection(input: CreateProposalSectionInput): Promise<ProposalSection> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is creating a new section within a proposal for organizing content.
-    return Promise.resolve({
-        id: 0, // Placeholder ID
+export const createProposalSection = async (input: CreateProposalSectionInput): Promise<ProposalSection> => {
+  try {
+    // Insert proposal section record
+    const result = await db.insert(proposalSectionsTable)
+      .values({
         proposal_id: input.proposal_id,
         title: input.title,
         content: input.content,
-        order_index: input.order_index,
-        is_completed: false,
-        created_at: new Date(),
-        updated_at: new Date()
-    } as ProposalSection);
-}
+        order_index: input.order_index
+      })
+      .returning()
+      .execute();
+
+    const section = result[0];
+    return section;
+  } catch (error) {
+    console.error('Proposal section creation failed:', error);
+    throw error;
+  }
+};

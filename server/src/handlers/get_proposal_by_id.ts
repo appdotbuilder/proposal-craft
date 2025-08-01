@@ -1,8 +1,23 @@
 
+import { db } from '../db';
+import { proposalsTable } from '../db/schema';
 import { type Proposal } from '../schema';
+import { eq } from 'drizzle-orm';
 
-export async function getProposalById(proposalId: number): Promise<Proposal | null> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is fetching a specific proposal by ID with all related data (sections, messages, etc.).
-    return null;
-}
+export const getProposalById = async (proposalId: number): Promise<Proposal | null> => {
+  try {
+    const results = await db.select()
+      .from(proposalsTable)
+      .where(eq(proposalsTable.id, proposalId))
+      .execute();
+
+    if (results.length === 0) {
+      return null;
+    }
+
+    return results[0];
+  } catch (error) {
+    console.error('Failed to get proposal by ID:', error);
+    throw error;
+  }
+};

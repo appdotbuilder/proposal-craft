@@ -1,8 +1,19 @@
 
+import { db } from '../db';
+import { proposalsTable } from '../db/schema';
 import { type Proposal } from '../schema';
+import { eq } from 'drizzle-orm';
 
 export async function getProposalsByUser(userId: number): Promise<Proposal[]> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is fetching all proposals belonging to a specific user from the database.
-    return [];
+  try {
+    const results = await db.select()
+      .from(proposalsTable)
+      .where(eq(proposalsTable.user_id, userId))
+      .execute();
+
+    return results;
+  } catch (error) {
+    console.error('Failed to fetch proposals for user:', error);
+    throw error;
+  }
 }

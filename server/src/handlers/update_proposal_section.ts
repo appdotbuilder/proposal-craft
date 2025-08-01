@@ -1,17 +1,46 @@
 
+import { db } from '../db';
+import { proposalSectionsTable } from '../db/schema';
 import { type UpdateProposalSectionInput, type ProposalSection } from '../schema';
+import { eq } from 'drizzle-orm';
 
-export async function updateProposalSection(input: UpdateProposalSectionInput): Promise<ProposalSection> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is updating section content, completion status, or order for iterative drafting.
-    return Promise.resolve({
-        id: input.id,
-        proposal_id: 0, // Placeholder
-        title: input.title || 'Updated Section',
-        content: input.content || null,
-        order_index: input.order_index || 0,
-        is_completed: input.is_completed || false,
-        created_at: new Date(),
-        updated_at: new Date()
-    } as ProposalSection);
-}
+export const updateProposalSection = async (input: UpdateProposalSectionInput): Promise<ProposalSection> => {
+  try {
+    // Build update object with only provided fields
+    const updateData: Partial<typeof proposalSectionsTable.$inferInsert> = {
+      updated_at: new Date()
+    };
+
+    if (input.title !== undefined) {
+      updateData.title = input.title;
+    }
+
+    if (input.content !== undefined) {
+      updateData.content = input.content;
+    }
+
+    if (input.order_index !== undefined) {
+      updateData.order_index = input.order_index;
+    }
+
+    if (input.is_completed !== undefined) {
+      updateData.is_completed = input.is_completed;
+    }
+
+    // Update the proposal section
+    const result = await db.update(proposalSectionsTable)
+      .set(updateData)
+      .where(eq(proposalSectionsTable.id, input.id))
+      .returning()
+      .execute();
+
+    if (result.length === 0) {
+      throw new Error(`Proposal section with id ${input.id} not found`);
+    }
+
+    return result[0];
+  } catch (error) {
+    console.error('Proposal section update failed:', error);
+    throw error;
+  }
+};
