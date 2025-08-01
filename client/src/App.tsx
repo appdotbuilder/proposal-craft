@@ -31,6 +31,14 @@ function App() {
     organization_id: 0
   });
 
+  // New organization form
+  const [showNewOrganizationForm, setShowNewOrganizationForm] = useState(false);
+  const [newOrganizationData, setNewOrganizationData] = useState({
+    name: '',
+    description: ''
+  });
+  const [isCreatingOrganization, setIsCreatingOrganization] = useState(false);
+
   // Load initial data
   const loadProposals = useCallback(async () => {
     try {
@@ -77,6 +85,28 @@ function App() {
       console.error('Failed to create proposal:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCreateOrganization = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newOrganizationData.name) return;
+    
+    setIsCreatingOrganization(true);
+    try {
+      const newOrganization = await trpc.createOrganization.mutate({
+        user_id: currentUser.id,
+        name: newOrganizationData.name,
+        description: newOrganizationData.description || null
+      });
+      
+      setOrganizations((prev: Organization[]) => [...prev, newOrganization]);
+      setNewOrganizationData({ name: '', description: '' });
+      setShowNewOrganizationForm(false);
+    } catch (error) {
+      console.error('Failed to create organization:', error);
+    } finally {
+      setIsCreatingOrganization(false);
     }
   };
 
@@ -227,6 +257,63 @@ function App() {
           </Card>
         )}
 
+        {/* New Organization Form */}
+        {showNewOrganizationForm && (
+          <Card className="mb-8 border-indigo-200 shadow-lg">
+            <CardHeader className="bg-indigo-50">
+              <CardTitle className="text-indigo-900">🏢 Create New Organization</CardTitle>
+              <CardDescription>Add your organization details to get started</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <form onSubmit={handleCreateOrganization} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Organization Name *
+                  </label>
+                  <Input
+                    placeholder="Enter your organization name"
+                    value={newOrganizationData.name}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setNewOrganizationData((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    required
+                    className="border-indigo-200 focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description (Optional)
+                  </label>
+                  <Input
+                    placeholder="Brief description of your organization"
+                    value={newOrganizationData.description}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setNewOrganizationData((prev) => ({ ...prev, description: e.target.value }))
+                    }
+                    className="border-indigo-200 focus:border-indigo-500"
+                  />
+                </div>
+                <div className="flex justify-end space-x-3">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setShowNewOrganizationForm(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={isCreatingOrganization}
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    {isCreatingOrganization ? '🏢 Creating...' : '✨ Create Organization'}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Main Content */}
         <Tabs defaultValue="proposals" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3 bg-white border shadow-sm">
@@ -307,7 +394,10 @@ function App() {
                   <p className="text-gray-600 text-center mb-6">
                     Add your organization details to get started with proposal writing
                   </p>
-                  <Button className="bg-indigo-600 hover:bg-indigo-700">
+                  <Button 
+                    onClick={() => setShowNewOrganizationForm(true)}
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Organization
                   </Button>
@@ -315,6 +405,19 @@ function App() {
               </Card>
             ) : (
               <div className="grid gap-6">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Your Organizations</h3>
+                    <p className="text-sm text-gray-600">Manage organizations you work with</p>
+                  </div>
+                  <Button 
+                    onClick={() => setShowNewOrganizationForm(true)}
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Organization
+                  </Button>
+                </div>
                 {organizations.map((org: Organization) => (
                   <Card key={org.id} className="hover:shadow-md transition-shadow">
                     <CardHeader>
