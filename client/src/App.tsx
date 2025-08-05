@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, FileText, Settings, Upload, Brain, Edit } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Plus, FileText, Settings, Upload, Brain, Edit, AlertCircle, User } from 'lucide-react';
 import { trpc } from '@/utils/trpc';
 import type { Proposal, Organization } from '../../server/src/schema';
 import { ProposalEditor } from '@/components/ProposalEditor';
@@ -38,6 +39,12 @@ function App() {
     description: ''
   });
   const [isCreatingOrganization, setIsCreatingOrganization] = useState(false);
+  const [organizationCreationError, setOrganizationCreationError] = useState<string | null>(null);
+
+  // User initialization
+  const [hasInitialUserBeenCreated, setHasInitialUserBeenCreated] = useState(false);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [userCreationError, setUserCreationError] = useState<string | null>(null);
 
   // Load initial data
   const loadProposals = useCallback(async () => {
@@ -58,10 +65,52 @@ function App() {
     }
   }, [currentUser.id]);
 
+  // User creation logic
+  const createInitialUser = useCallback(async () => {
+    if (hasInitialUserBeenCreated) return;
+    
+    setIsCreatingUser(true);
+    setUserCreationError(null);
+    try {
+      await trpc.createUser.mutate({
+        email: 'john@example.com',
+        full_name: 'John Doe'
+      });
+      setHasInitialUserBeenCreated(true);
+    } catch (error) {
+      console.error('Failed to create initial user:', error);
+      
+      // Check if the error is due to duplicate user (user already exists)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create user';
+      if (errorMessage.includes('duplicate key value violates unique constraint') && errorMessage.includes('users_email_unique')) {
+        // User already exists, this is not really an error for our use case
+        setHasInitialUserBeenCreated(true);
+        console.log('User already exists - initialization complete');
+      } else {
+        // Other errors should be displayed
+        setUserCreationError(errorMessage);
+      }
+    } finally {
+      setIsCreatingUser(false);
+    }
+  }, [hasInitialUserBeenCreated]);
+
   useEffect(() => {
-    loadProposals();
-    loadOrganizations();
+    const loadInitialData = async () => {
+      await loadProposals();
+      await loadOrganizations();
+    };
+    
+    loadInitialData();
   }, [loadProposals, loadOrganizations]);
+
+  // Separate effect for user initialization to avoid issues with organizations dependency
+  useEffect(() => {
+    // Only try to create user if we haven't tried yet and there are no organizations
+    if (organizations.length === 0 && !hasInitialUserBeenCreated && !isCreatingUser) {
+      createInitialUser();
+    }
+  }, [organizations.length, hasInitialUserBeenCreated, isCreatingUser, createInitialUser]);
 
   const handleCreateProposal = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,6 +142,7 @@ function App() {
     if (!newOrganizationData.name) return;
     
     setIsCreatingOrganization(true);
+    setOrganizationCreationError(null);
     try {
       const newOrganization = await trpc.createOrganization.mutate({
         user_id: currentUser.id,
@@ -105,6 +155,7 @@ function App() {
       setShowNewOrganizationForm(false);
     } catch (error) {
       console.error('Failed to create organization:', error);
+      setOrganizationCreationError(error instanceof Error ? error.message : 'Failed to create organization');
     } finally {
       setIsCreatingOrganization(false);
     }
@@ -265,6 +316,14 @@ function App() {
               <CardDescription>Add your organization details to get started</CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
+              {organizationCreationError && (
+                <Alert className="mb-4 border-red-200 bg-red-50">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                  <AlertDescription className="text-red-700">
+                    {organizationCreationError}
+                  </AlertDescription>
+                </Alert>
+              )}
               <form onSubmit={handleCreateOrganization} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -273,9 +332,11 @@ function App() {
                   <Input
                     placeholder="Enter your organization name"
                     value={newOrganizationData.name}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setNewOrganizationData((prev) => ({ ...prev, name: e.target.value }))
-                    }
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      setNewOrganizationData((prev) => ({ ...prev, name: e.target.value }));
+                      // Clear error when user starts typing
+                      if (organizationCreationError) setOrganizationCreationError(null);
+                    }}
                     required
                     className="border-indigo-200 focus:border-indigo-500"
                   />
@@ -297,7 +358,10 @@ function App() {
                   <Button 
                     type="button" 
                     variant="outline" 
-                    onClick={() => setShowNewOrganizationForm(false)}
+                    onClick={() => {
+                      setShowNewOrganizationForm(false);
+                      setOrganizationCreationError(null);
+                    }}
                   >
                     Cancel
                   </Button>
@@ -394,13 +458,36 @@ function App() {
                   <p className="text-gray-600 text-center mb-6">
                     Add your organization details to get started with proposal writing
                   </p>
-                  <Button 
-                    onClick={() => setShowNewOrganizationForm(true)}
-                    className="bg-indigo-600 hover:bg-indigo-700"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Organization
-                  </Button>
+                  
+                  {userCreationError && (
+                    <Alert className="mb-4 border-red-200 bg-red-50 max-w-md">
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                      <AlertDescription className="text-red-700">
+                        {userCreationError}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {!hasInitialUserBeenCreated && (
+                      <Button 
+                        onClick={createInitialUser}
+                        disabled={isCreatingUser}
+                        variant="outline"
+                        className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                      >
+                        <User className="h-4 w-4 mr-2" />
+                        {isCreatingUser ? 'Setting up Account...' : 'Setup Account'}
+                      </Button>
+                    )}
+                    <Button 
+                      onClick={() => setShowNewOrganizationForm(true)}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Organization
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ) : (
